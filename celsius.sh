@@ -6,18 +6,18 @@
 #This script is in development and is not intended for public use.
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}")" && pwd ) #sets working directory to script location.
+LOG=$DIR/log.txt
 
-#Checks for/creates a Log folder and files for celsius.
-mkdir -p -m 775 $DIR/log
-touch $DIR/log/cputemp.txt; chmod 664 $DIR/log/cputemp.txt
-touch $DIR/log/hddtemp.txt; chmod 664 $DIR/log/hddtemp.txt
+#Creates a log file if not present
+touch $LOG; chmod 664 $LOG
+
 #Timestamp Logs
-echo $(date +%F_%T) | tee -a $DIR/log/cputemp.txt $DIR/log/hddtemp.txt > /dev/null
+echo $(date +%F_%T) >> $LOG
 #CPU temperature
-sysctl -a |egrep -E "cpu\.[0-9]+\.temp" >> $DIR/log/cputemp.txt
+sysctl -a |egrep -E "cpu\.[0-9]+\.temp" >> $LOG
 
 #adastat Start
-LOGFILE=$DIR/log/hddtemp.txt
+LOGFILE=$LOG
 adastat () {
   CM=$(camcontrol cmd $1 -a "E5 00 00 00 00 00 00 00 00 00 00 00" -r - | awk '{print $10}')
   if [ "$CM" = "FF" ] ; then
@@ -32,11 +32,11 @@ adastat () {
 
 
 #HDD temperature
-echo "Drive Activity Status" >> $DIR/log/hddtemp.txt
-for i in $(sysctl -n kern.disks | awk '{for (i=NF; i!=0 ; i--) if(match($i, '/ada/')) print $i }' ); do echo -n $i:; adastat $i; done; echo ; echo >> $DIR/log/hddtemp.txt
-echo "HDD Temperature:" >> $DIR/log/hddtemp.txt
+echo "Drive Activity Status" >> $LOG
+for i in $(sysctl -n kern.disks | awk '{for (i=NF; i!=0 ; i--) if(match($i, '/ada/')) print $i }' ); do echo -n $i:; adastat $i; done; echo ; echo >> $LOG
+echo "HDD Temperature:" >> $LOG
 for i in $(sysctl -n kern.disks | awk '{for (i=NF; i!=0 ; i--) if(match($i, '/ada/')) print $i }' )
 do
-   echo $i `smartctl -a /dev/$i | awk '/Temperature_Celsius/{DevTemp=$10;} /Serial Number:/{DevSerNum=$3}; /Device Model:/{DevName=$3} END { print DevTemp,DevSerNum,DevName }'` >> $DIR/log/hddtemp.txt
+   echo $i `smartctl -a /dev/$i | awk '/Temperature_Celsius/{DevTemp=$10;} /Serial Number:/{DevSerNum=$3}; /Device Model:/{DevName=$3} END { print DevTemp,DevSerNum,DevName }'` >> $LOG
 done
-echo >> $DIR/log/hddtemp.txt
+echo >> $LOG
