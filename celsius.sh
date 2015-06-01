@@ -9,8 +9,10 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}")" && pwd ) #sets working directory to 
 LOG=$DIR/log.txt
 
 #Creates a log file if not present
-touch $LOG; chmod 664 $LOG
-
+if [ ! -f /$LOG ]; then
+	echo "Creating log file"
+	touch $LOG; chmod 664 $LOG
+fi
 #Timestamp Logs
 echo $(date +%F_%T) >> $LOG
 #CPU temperature
