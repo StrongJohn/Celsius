@@ -5,12 +5,40 @@
 #Celsius is a script to log temperatures for FreeNAS systems.
 #This script is in development and is not intended for public use.
 
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}")" && pwd )
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}")" && pwd ) #sets working directory to script location.
+LOG=$DIR/log.txt
 
-#Checks for/creates  Log folder in celsius
-mkdir -p -m 775 $DIR/log
-touch $DIR/log/cputemp.txt; chmod 664 $DIR/log/cputemp.txt
+#Creates a log file if not present
+if [ ! -f /$LOG ]; then
+	echo "Creating log file"
+	touch $LOG; chmod 664 $LOG
+fi
+#Timestamp Logs
+echo $(date +%F_%T) >> $LOG
+#CPU temperature
+sysctl -a |egrep -E "cpu\.[0-9]+\.temp" >> $LOG
 
-echo $(date +%F_%T) >> $DIR/log/cputemp.txt
+#adastat Start
+LOGFILE=$LOG
+adastat () {
+  CM=$(camcontrol cmd $1 -a "E5 00 00 00 00 00 00 00 00 00 00 00" -r - | awk '{print $10}')
+  if [ "$CM" = "FF" ] ; then
+  echo "$1:SPINNING" >> $LOGFILE
+  elif [ "$CM" = "00" ] ; then
+  echo "$1:IDLE" >> $LOGFILE
+  else
+  echo "$1:UNKNOWN ($CM)" >> $LOGFILE
+  fi
+}
+#adastat End
 
-sysctl -a |egrep -E "cpu\.[0-9]+\.temp" >> $DIR/log/cputemp.txt
+
+#HDD temperature
+echo "Drive Activity Status" >> $LOG
+for i in $(sysctl -n kern.disks | awk '{for (i=NF; i!=0 ; i--) if(match($i, '/ada/')) print $i }' ); do echo -n $i:; adastat $i; done; echo ; echo >> $LOG
+echo "HDD Temperature:" >> $LOG
+for i in $(sysctl -n kern.disks | awk '{for (i=NF; i!=0 ; i--) if(match($i, '/ada/')) print $i }' )
+do
+   echo $i `smartctl -a /dev/$i | awk '/Temperature_Celsius/{DevTemp=$10;} /Serial Number:/{DevSerNum=$3}; /Device Model:/{DevName=$3} END { print DevTemp,DevSerNum,DevName }'` >> $LOG
+done
+echo >> $LOG
